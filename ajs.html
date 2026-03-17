@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html ng-app="studentApp">
+<head>
+  <title>Smart Student Analytics</title>
+
+  <!-- AngularJS -->
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular-route.js"></script>
+
+  <style>
+    body { font-family: Arial; margin: 0; background: #f4f6f9; }
+
+    nav {
+      background: #111;
+      padding: 15px;
+      text-align: center;
+    }
+
+    nav a {
+      color: white;
+      margin: 15px;
+      text-decoration: none;
+      font-weight: bold;
+    }
+
+    .container {
+      padding: 20px;
+      text-align: center;
+    }
+
+    .card {
+      display: inline-block;
+      background: white;
+      padding: 20px;
+      margin: 10px;
+      width: 200px;
+      border-radius: 10px;
+      box-shadow: 0 2px 5px gray;
+    }
+
+    input, select {
+      padding: 8px;
+      margin: 5px;
+    }
+
+    button {
+      padding: 8px 15px;
+      margin: 5px;
+      border: none;
+      background: black;
+      color: white;
+      cursor: pointer;
+    }
+
+    table {
+      margin: auto;
+      width: 85%;
+      border-collapse: collapse;
+      background: white;
+    }
+
+    th, td {
+      padding: 10px;
+      border: 1px solid #ddd;
+    }
+
+    th {
+      background: #222;
+      color: white;
+    }
+
+    .good { color: green; font-weight: bold; }
+    .avg { color: orange; font-weight: bold; }
+    .bad { color: red; font-weight: bold; }
+  </style>
+</head>
+
+<body>
+
+<!-- NAVBAR -->
+<nav>
+  <a href="#!/">Dashboard</a>
+  <a href="#!/add">Add Student</a>
+  <a href="#!/manage">Manage Students</a>
+</nav>
+
+<div ng-view class="container"></div>
+
+<script>
+var app = angular.module("studentApp", ["ngRoute"]);
+
+// ROUTES
+app.config(function($routeProvider) {
+
+  $routeProvider
+
+  // DASHBOARD
+  .when("/", {
+    template: `
+      <h2>Dashboard</h2>
+
+      <div class="card">Total Students <br><h2>{{students.length}}</h2></div>
+      <div class="card">Average Marks <br><h2>{{getAverage()}}%</h2></div>
+      <div class="card">Topper <br><h2>{{getTopper().name || '-'}}</h2></div>
+      <div class="card">Failures <br><h2>{{getFailures()}}</h2></div>
+
+      <h3>Top 3 Students</h3>
+      <ul>
+        <li ng-repeat="s in getTop3()">
+          {{s.name}} - {{s.marks}}
+        </li>
+      </ul>
+    `,
+    controller: "mainCtrl"
+  })
+
+  // ADD PAGE
+  .when("/add", {
+    template: `
+      <h2>Add Student</h2>
+      <input type="text" placeholder="Name" ng-model="student.name"><br>
+      <input type="number" placeholder="Marks" ng-model="student.marks"><br><br>
+      <button ng-click="addStudent()">Add</button>
+    `,
+    controller: "addCtrl"
+  })
+
+  // MANAGE PAGE
+  .when("/manage", {
+    template: `
+      <h2>📋 Manage Students</h2>
+
+      <input type="text" placeholder="Search..." ng-model="searchText">
+
+      <select ng-model="filterType">
+        <option value="">All</option>
+        <option value="pass">Pass</option>
+        <option value="fail">Fail</option>
+      </select>
+
+      <br><br>
+
+      <table>
+        <tr>
+          <th>Name</th>
+          <th>Marks</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+
+        <tr ng-repeat="s in students | filter:searchText">
+          <td>{{s.name}}</td>
+          <td>{{s.marks}}</td>
+
+          <td>
+            <span ng-class="getClass(s.marks)">
+              {{getStatus(s.marks)}}
+            </span>
+          </td>
+
+          <td>
+            <button ng-click="editStudent($index)">Edit</button>
+            <button ng-click="deleteStudent($index)">Delete</button>
+          </td>
+        </tr>
+      </table>
+    `,
+    controller: "mainCtrl"
+  });
+
+});
+
+// MAIN CONTROLLER
+app.controller("mainCtrl", function($scope) {
+
+  $scope.students = JSON.parse(localStorage.getItem("students")) || [];
+
+  // DELETE
+  $scope.deleteStudent = function(index) {
+    $scope.students.splice(index, 1);
+    localStorage.setItem("students", JSON.stringify($scope.students));
+  };
+
+  // EDIT
+  $scope.editStudent = function(index) {
+    let s = $scope.students[index];
+    let newMarks = prompt("Update marks:", s.marks);
+    if(newMarks != null) {
+      s.marks = newMarks;
+      localStorage.setItem("students", JSON.stringify($scope.students));
+    }
+  };
+
+  // STATUS
+  $scope.getStatus = function(m) {
+    if (m >= 80) return "Excellent";
+    else if (m >= 50) return "Average";
+    else return "Fail";
+  };
+
+  $scope.getClass = function(m) {
+    if (m >= 80) return "good";
+    else if (m >= 50) return "avg";
+    else return "bad";
+  };
+
+  // ANALYTICS
+  $scope.getAverage = function() {
+    if ($scope.students.length == 0) return 0;
+    let total = 0;
+    $scope.students.forEach(s => total += Number(s.marks));
+    return (total / $scope.students.length).toFixed(2);
+  };
+
+  $scope.getTopper = function() {
+    if ($scope.students.length == 0) return {};
+    return $scope.students.reduce((a, b) => a.marks > b.marks ? a : b);
+  };
+
+  $scope.getFailures = function() {
+    return $scope.students.filter(s => s.marks < 40).length;
+  };
+
+  $scope.getTop3 = function() {
+    return [...$scope.students]
+      .sort((a,b) => b.marks - a.marks)
+      .slice(0,3);
+  };
+
+});
+
+// ADD CONTROLLER
+app.controller("addCtrl", function($scope) {
+
+  $scope.student = {};
+
+  $scope.addStudent = function() {
+    let students = JSON.parse(localStorage.getItem("students")) || [];
+    students.push($scope.student);
+    localStorage.setItem("students", JSON.stringify(students));
+
+    alert("Student Added!");
+    $scope.student = {};
+  };
+
+});
+</script>
+
+</body>
+</html>
